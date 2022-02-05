@@ -1,0 +1,7 @@
+- hosts: workers
+  become: yes
+  tasks:
+    - name: Install postgres
+      apt:
+        name: postgresql
+        state: present

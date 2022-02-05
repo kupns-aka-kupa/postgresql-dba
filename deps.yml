@@ -7,6 +7,7 @@
       apt:
         name:
           - apt-transport-https
+          - vim
           - gcc
           - make
           - autoconf
@@ -23,9 +24,3 @@
           - docker
           - openshift
         extra_args: -i {{pypi_reg}}
-
-    - name: Install postgres
-      apt:
-        name:
-          - postgresql
-        state: present
