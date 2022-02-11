@@ -5,12 +5,39 @@
 ansible-playbook -i hosts.ini -i cred.ini install.yml 
 ```
 
-2. Create database
+2. Configure postgres
+- Setup postgres password
+```shell
+sudo -u postgres psql
+----
+postgres=# alter user postgres with password '{{postgres_password}}';
+```
+- `postgressql.conf`
+```shell
+listen_addresses = '*'     
+```
+or
+```shell
+postgres=# alter system set listen_addresses to '*';
+```
+
+- `pg_hba.conf`
+```shell
+host    all             all             0.0.0.0/0            md5
+```
+
+Finally
+
+```shell
+sudo systemctl restart postgresql
+```
+
+3. Create database
 ```shell
 psql -h <host> -c "create database hw1" -U postgres
 ```
 
-2. Create table
+4. Create table
 ```shell
 psql -h <host> -b hw1 -U postgres << EOF
 create table authors
@@ -22,7 +49,7 @@ create table authors
 EOF
 ```
 
-2. Insert data
+5. Insert data
 ```shell
 psql -h <host> -b hw1 -U postgres << EOF
 insert into authors(name, masterpiece)
