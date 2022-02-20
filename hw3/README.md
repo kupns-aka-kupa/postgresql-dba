@@ -35,20 +35,23 @@ values ('Volkswagen Tiguan', 2375000, '2021-01-01'),
 | 2   | 23046f92e4afb82c | Volkswagen Touareg | 1399000 | 2011-01-01 |
 
 Session #1
+
 ```sql
 begin;
-update cars 
-set cost = 2000000 
-where id = (select id from cars order by id desc  limit 1);
+update cars
+set cost = 2000000
+where id = (select id from cars order by id desc limit 1);
 ```
 
 Session #2
+
 ```sql
 begin;
-create index on cars(vin);
+create index on cars (vin);
 ```
 
 Session #3
+
 ```shell
 cat /var/log/postgresql/postgresql-12-main.log | tail -n 20
 ```
@@ -71,6 +74,7 @@ cat /var/log/postgresql/postgresql-12-main.log | tail -n 20
 ## <a name="2"></a> #2
 
 Session #1
+
 ```sql
 begin;
 select txid_current();
@@ -81,7 +85,9 @@ update cars
 set cost = cost + 1000000
 where id = 2;
 ```
+
 Session #2
+
 ```sql
 begin;
 select txid_current();
@@ -92,7 +98,9 @@ update cars
 set cost = cost + 2000000
 where id = 2;
 ```
+
 Session #3
+
 ```sql
 begin;
 select txid_current();
@@ -137,6 +145,40 @@ order by pid;
 | RowExclusiveLock | 3385 | relation      | true    | NULL          | {3164}             |
 
 ## <a name="3"></a> #3
+
 ## <a name="4"></a> #4
 
 # Auto vacuum
+
+Run pgbench on other host
+
+- `postgressql.conf`
+
+```shell
+autovacuum = on 
+log_autovacuum_min_duration = 0
+autovacuum_max_workers = 10
+autovacuum_naptime = 5s
+autovacuum_vacuum_scale_factor = 0.01 
+autovacuum_analyze_scale_factor = 0.01 
+autovacuum_vacuum_cost_delay = 1ms  
+
+max_connections = 40
+shared_buffers = 4GB
+effective_cache_size = 4GB
+maintenance_work_mem = 2048MB
+checkpoint_completion_target= 0.9
+wal_buffers = 128MB
+default_statistics_target = 500
+random_page_cost = 4
+effective_io_concurrency = 2
+work_mem = 6553kB
+min_wal_size = 4GB
+max_wal_size = 16GB
+```
+
+```shell
+python3 bench.py
+```
+
+![Plot](pg_bench_plot.png)
