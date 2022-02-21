@@ -1,9 +1,11 @@
-# Locks
+# <a name="locks"></a> Locks
 
-1. [#1](#1)
-2. [#2](#2)
-3. [#3](#3)
-4. [#4](#4)
+1. [Locks](#locks)
+    - [#1](#1)
+    - [#2](#2)
+    - [#3](#3)
+    - [#4](#4)
+2. [Auto vacuum](#autovacuum)
 
 ## <a name="1"></a> #1
 
@@ -120,14 +122,14 @@ where locktype in ('relation', 'transactionid', 'tuple')
 order by pid;
 ```
 
-- **592** exclusively lock row for _update_ and share lock for _select_
+- **592** takes `row exclusive` table for row _update_ and `for share` row lock for _select_
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
 | ExclusiveLock    | 3153 | transactionid | true    | 592           |                    |
 | RowExclusiveLock | 3153 | relation      | true    | NULL          |                    |
 
-- **593** takes row exclusive lock for _update_ on version of row changed by **592** and sleep
+- **593** takes `row exclusive` table lock for _update_ on version of row changed by **592**, awaits `for share` lock and sleep
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
@@ -136,7 +138,7 @@ order by pid;
 | RowExclusiveLock | 3164 | relation      | true    | NULL          | {3153}             |
 | ExclusiveLock    | 3164 | transactionid | true    | 593           | {3153}             |
 
-- **594** takes row exclusive lock for _update_ on uncommited version of row from **593** and sleep
+- **594** takes `row exclusive` table lock for _update_ on uncommited version of row from **593** and sleep
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
@@ -144,11 +146,17 @@ order by pid;
 | ExclusiveLock    | 3385 | transactionid | true    | 594           | {3164}             |
 | RowExclusiveLock | 3385 | relation      | true    | NULL          | {3164}             |
 
+---
+
 ## <a name="3"></a> #3
+
+---
 
 ## <a name="4"></a> #4
 
-# Auto vacuum
+---
+
+# <a name="autovacuum"></a> Auto vacuum
 
 Run pgbench on other host
 
@@ -181,4 +189,12 @@ max_wal_size = 16GB
 python3 bench.py
 ```
 
-![Plot](pg_bench_plot.png)
+## 600s benchmark
+
+![Plot](pg_bench_plot_600s.png)
+
+---
+
+## 10h benchmark
+
+![Plot](pg_bench_plot_10h.png)

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 host = ipaddress.ip_address('172.23.169.19')
 sec = timedelta(hours=10)
+d = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
 
 
 def plot_args(stderr):
@@ -23,7 +24,7 @@ def isfloat(s: str):
 
 debug_plot = False
 
-data_file = 'pg_bench_stat_{0}.csv'
+data_file = 'pg_bench_stat_{0}.{1}'
 
 
 def run():
@@ -48,13 +49,14 @@ def run():
 if __name__ == '__main__':
     t = run()
 
-    np.savetxt(data_file.format(datetime.now().strftime("%d-%m-%Y-%H:%M:%S")), t, delimiter='|')
+    np.savetxt(data_file.format(d, 'csv'), t, delimiter='|')
 
     fig, (tps, lat, stddev) = plt.subplots(3)
     tps.plot(t[0], t[1])
     tps.set_title('tps')
     lat.plot(t[0], t[2], 'tab:orange')
     lat.set_title('lat')
+    lat.set(ylabel='ms')
     stddev.plot(t[0], t[3], 'tab:green')
     stddev.set_title('stddev')
 
@@ -63,4 +65,4 @@ if __name__ == '__main__':
         ax.label_outer()
 
     plt.show()
-    plt.savefig('pg_bench_plot.png')
+    plt.savefig(data_file.format(d, 'png'))
