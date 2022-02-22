@@ -28,6 +28,7 @@ create table cars
 );
 insert into cars(mark, cost, year)
 values ('Volkswagen Tiguan', 2375000, '2021-01-01'),
+       ('Volkswagen Polo', 1375000, '2021-01-01'),
        ('Volkswagen Touareg', 1399000, '2011-01-01');
 ```
 
@@ -129,7 +130,8 @@ order by pid;
 | ExclusiveLock    | 3153 | transactionid | true    | 592           |                    |
 | RowExclusiveLock | 3153 | relation      | true    | NULL          |                    |
 
-- **593** takes `row exclusive` table lock for _update_ on version of row changed by **592**, awaits `for share` lock and sleep
+- **593** takes `row exclusive` table lock for _update_ on version of row changed by **592**, awaits `for share` lock
+  and sleep
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
@@ -160,6 +162,22 @@ order by pid;
 
 Run pgbench on other host
 
+```shell
+python3 bench.py
+```
+
+## Default postgres
+
+![Plot](pg_bench_stat_default.png)
+
+## Autovacuum Off
+
+![Plot](pg_bench_stat_autovacuum_off.png)
+
+---
+
+Setup autovauum
+
 - `postgressql.conf`
 
 ```shell
@@ -174,27 +192,29 @@ autovacuum_vacuum_cost_delay = 1ms
 max_connections = 40
 shared_buffers = 4GB
 effective_cache_size = 4GB
-maintenance_work_mem = 2048MB
+maintenance_work_mem = 4GB
 checkpoint_completion_target= 0.9
 wal_buffers = 128MB
 default_statistics_target = 500
-random_page_cost = 4
-effective_io_concurrency = 2
-work_mem = 6553kB
+effective_io_concurrency = 100
+work_mem = 1GB
 min_wal_size = 4GB
 max_wal_size = 16GB
-```
-
-```shell
-python3 bench.py
 ```
 
 ## 600s benchmark
 
 ![Plot](pg_bench_plot_600s.png)
 
----
-
 ## 10h benchmark
 
 ![Plot](pg_bench_plot_10h.png)
+
+```shell
+sudo iotop -aoP
+```
+
+```shell
+Total DISK READ:         0.00 B/s | Total DISK WRITE:      1263.80 K/s
+Current DISK READ:       0.00 B/s | Current DISK WRITE:    1153.91 K/s
+```
