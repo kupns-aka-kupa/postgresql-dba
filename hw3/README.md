@@ -32,11 +32,6 @@ values ('Volkswagen Tiguan', 2375000, '2021-01-01'),
        ('Volkswagen Touareg', 1399000, '2011-01-01');
 ```
 
-| id  | vin              | mark               | cost    | year       |
-|-----|------------------|--------------------|---------|------------|
-| 1   | 9ceff16be913f232 | Volkswagen Tiguan  | 2375000 | 2021-01-01 |
-| 2   | 23046f92e4afb82c | Volkswagen Touareg | 1399000 | 2011-01-01 |
-
 Session #1
 
 ```sql
@@ -123,15 +118,14 @@ where locktype in ('relation', 'transactionid', 'tuple')
 order by pid;
 ```
 
-- **592** takes `row exclusive` table for row _update_ and `for share` row lock for _select_
+- __UPDATE__ by **592** takes `row exclusive` _table level_ lock and `for share` _row level_ lock
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
 | ExclusiveLock    | 3153 | transactionid | true    | 592           |                    |
 | RowExclusiveLock | 3153 | relation      | true    | NULL          |                    |
 
-- **593** takes `row exclusive` table lock for _update_ on version of row changed by **592**, awaits `for share` lock
-  and sleep
+- __UPDATE__ by **593** takes `row exclusive` _table level_, take _tuple lock_ on version of row changed by **592** and sleep
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
@@ -140,7 +134,7 @@ order by pid;
 | RowExclusiveLock | 3164 | relation      | true    | NULL          | {3153}             |
 | ExclusiveLock    | 3164 | transactionid | true    | 593           | {3153}             |
 
-- **594** takes `row exclusive` table lock for _update_ on uncommited version of row from **593** and sleep
+- __UPDATE__ by **594** takes `row exclusive` _table level_ lock, try take _tuple lock_ on __uncommited__ version of row from **593** to avoid loss of data if **591** transaction failed or rolled back and sleep
 
 | mode             | pid  | locktype      | granted | transactionid | pg\_blocking\_pids |
 |:-----------------|:-----|:--------------|:--------|:--------------|:-------------------|
@@ -226,6 +220,46 @@ Details
 
 ## <a name="4"></a> #4
 
+Create delay func
+```sql
+create or replace function delay(n numeric) returns numeric as
+$$
+select pg_sleep(5);
+select n + 100.00;
+$$ language sql;
+```
+Session #1
+
+```sql
+update cars
+set cost = c.cost + delay(c.cost)
+from (select * from cars order by cost desc for update) as c;
+---
+ERROR:  deadlock detected
+DETAIL:  Process 21213 waits for ShareLock on transaction 1558001;
+blocked by process 21835.
+Process 21835 waits for ShareLock on transaction 1558000;
+blocked by process 21213.
+HINT:  See server log for query details.
+CONTEXT:  while locking tuple (0,2) in relation "cars"
+```
+
+Session #2
+
+```sql
+update cars
+set cost = c.cost + delay(c.cost)
+from (select * from cars order by cost for update) as c;
+```
+
+How to avoid dead lock 🤔? Quiet simple 😎
+
+```sql
+update cars
+set cost = c.cost + delay(c.cost)
+from (select * from (select * from cars for update) as _ order by cost desc) as c;
+```
+
 ---
 
 # <a name="autovacuum"></a> Auto vacuum
@@ -263,7 +297,7 @@ max_connections = 40
 shared_buffers = 4GB
 effective_cache_size = 4GB
 maintenance_work_mem = 4GB
-checkpoint_completion_target= 0.9
+checkpoint_completion_target = 0.9
 wal_buffers = 128MB
 default_statistics_target = 500
 effective_io_concurrency = 100
