@@ -152,6 +152,76 @@ order by pid;
 
 ## <a name="3"></a> #3
 
+Session #1
+
+```sql
+begin;
+update cars
+set cost = cost + 1
+where id = 1;
+
+-- goto session #2
+
+update cars
+set cost = cost + 1
+where id = 3;
+```
+
+Session #2
+
+```sql
+begin;
+update cars
+set cost = cost + 1
+where id = 2;
+
+-- goto session #3
+
+update cars
+set cost = cost + 1
+where id = 1;
+
+-- goto session #3
+
+```
+
+Session #3
+
+```sql
+begin;
+update cars
+set cost = cost + 1
+where id = 3;
+
+-- goto session #2
+
+update cars
+set cost = cost + 1
+where id = 2;
+-- goto session #1
+```
+
+```
+ERROR:  deadlock detected
+DETAIL:  Process 21213 waits for ShareLock on transaction 1557863; blocked by process 114958.
+Process 114958 waits for ShareLock on transaction 1557862; blocked by process 21835.
+Process 21835 waits for ShareLock on transaction 1557857; blocked by process 21213.
+HINT:  See server log for query details.
+CONTEXT:  while updating tuple (0,56) in relation "cars"
+```
+
+Details
+
+```shell
+2022-03-08 15:37:55.473 MSK [21213] postgres@hw3 DETAIL:  Process 21213 waits for ShareLock on transaction 1557863; blocked by process 114958.
+        Process 114958 waits for ShareLock on transaction 1557862; blocked by process 21835.
+        Process 21835 waits for ShareLock on transaction 1557857; blocked by process 21213.
+        Process 21213: update cars
+        set cost = cost + 1 where id = 3;
+        Process 114958: update cars set cost = cost + 1 where id = 2;
+        Process 21835: update cars set cost = cost + 1 where id = 1;
+```
+
 ---
 
 ## <a name="4"></a> #4
