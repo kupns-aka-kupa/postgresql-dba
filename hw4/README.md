@@ -3,7 +3,7 @@
 1. [Roles](#roles)
 2. [WAL](#wal)
 
-# <a name="roles"></a> Roles
+## <a name="roles"></a> Roles
 
 1. Create database
 
@@ -66,4 +66,12 @@ psql -b hw4 -U hw4 -c "select * from hw.authors"
 
 ---
 
-# <a name="wal"></a> WAL
+## <a name="wal"></a> WAL
+
+1. Setup checkpoints timeout
+
+- `postgressql.conf`
+
+```shell
+checkpoint_timeout = 30s   
+```
