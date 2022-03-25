@@ -2,6 +2,7 @@
 
 1. [Roles](#roles)
 2. [WAL](#wal)
+3. [Checksum](#checksum)
 
 ## <a name="roles"></a> Roles
 
@@ -68,10 +69,155 @@ psql -b hw4 -U hw4 -c "select * from hw.authors"
 
 ## <a name="wal"></a> WAL
 
-1. Setup checkpoints timeout
+1. Create clear cluster
+
+```shell
+sudo pg_createcluster 13 hw4
+sudo systemctl start postgresql@13-hw4
+```
+
+2. Setup checkpoints timeout
 
 - `postgressql.conf`
 
 ```shell
 checkpoint_timeout = 30s   
 ```
+
+3. After bench
+
+```shell
+sudo du -sh /var/lib/postgresql/13/hw4/pg_wal
+---
+33M     /var/lib/postgresql/13/hw4/pg_wal
+```
+
+4. Before bench
+
+```shell
+pgbench -i postgres -p 5433
+pgbench -c8 -P 10 -T 600 -p 5433
+---
+tps 297.251593
+```
+
+```shell
+sudo du -sh /var/lib/postgresql/13/hw4/pg_wal
+---
+49M     /var/lib/postgresql/13/hw4/pg_wal
+```
+
+### Stats
+
+```sql
+with sub as (select extract(epoch from (now() - pg_postmaster_start_time())) as seconds_since_start,
+                    (checkpoints_timed + checkpoints_req)                    as total_checkpoints,
+                    buffers_checkpoint                                       as total_buffers
+             from pg_stat_bgwriter
+)
+select total_checkpoints,
+       total_buffers / total_checkpoints            as buffers_per_checkpoint,
+       seconds_since_start / total_checkpoints / 60 as minutes_between_checkpoints
+from sub;
+```
+
+| total\_checkpoints | buffers\_per\_checkpoint | minutes\_between\_checkpoints |
+|:-------------------|:-------------------------|:------------------------------|
+| 119                | 678                      | 0.5004252606442577            |
+
+**Result**: All checkpoints in time
+
+```sql
+select *
+from pg_stat_bgwriter;
+```
+
+| checkpoints\_timed | checkpoints\_req | checkpoint\_write\_time | checkpoint\_sync\_time | buffers\_checkpoint | buffers\_clean | maxwritten\_clean | buffers\_backend | buffers\_backend\_fsync | buffers\_alloc | stats\_reset                      |
+|:-------------------|:-----------------|:------------------------|:-----------------------|:--------------------|:---------------|:------------------|:-----------------|:------------------------|:---------------|:----------------------------------|
+| 83                 | 0                | 310873                  | 553                    | 40803               | 0              | 0                 | 1289             | 0                       | 5773           | 2022-03-25 07:15:28.340754 +00:00 |
+
+5. Disable sync commit
+
+- `postgressql.conf`
+
+```shell
+synchronous_commit = off  
+```
+
+restart cluster
+
+```shell
+sudo systemctl restart postgresql@13-hw4
+```
+
+and bench
+
+```shell
+pgbench -c8 -P 10 -T 600 -p 5433
+---
+tps 5829.841140
+```
+
+| total\_checkpoints | buffers\_per\_checkpoint | minutes\_between\_checkpoints |
+|:-------------------|:-------------------------|:------------------------------|
+| 146                | 1076                     | 0.07926182876712327           |
+
+```shell
+193M    /var/lib/postgresql/13/hw4/pg_wal
+```
+
+- Disabling `synchronous_commit` releases transactions without waiting for the **WAL** to be written to the detriment of
+  crash recovery.
+- Many successful transactions push dirty pages out of `wal_buffers = shared_buffers/32 = 4Mb` quickly
+  exceeding `max_wal_size = 1Gb`
+  to disk in a short time, reducing the time between checkpoints
+
+## <a name="checksum"></a> Checksum
+
+1. Enable checksum
+
+```shell
+sudo systemctl stop postgresql@13-hw4
+sudo /usr/lib/postgresql/13/bin/pg_checksums -e -D /var/lib/postgresql/13/hw4
+sudo systemctl start postgresql@13-hw4
+```
+
+2. Create table
+
+```sql
+create table test
+(
+    id text
+);
+insert into test
+values ('1111111'),
+       ('2222222'),
+       ('3333333');
+
+select pg_relation_filepath('test');
+---
+base/16387/16391
+```
+
+```shell
+sudo systemctl stop postgresql@13-hw4
+```
+
+3. Corrupt table file `base/16387/16391`
+
+```sql
+select *
+from test;
+---
+[XX001] ERROR: invalid page in block 0 of relation base/16387/16391
+```
+
+```sql
+set ignore_checksum_failure = on;
+```
+
+| id          |
+|:------------|
+| 111111**2** |
+| 2222222     |
+| 3333333     |
