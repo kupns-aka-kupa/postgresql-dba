@@ -1,0 +1,19 @@
+- hosts: workers
+  become: yes
+  tasks:
+    - name: Install nfs
+      apt:
+        name:
+          - nfs-common
+          - nfs-server
+        state: present
+        
+    - name: Enable nfs module
+      community.general.modprobe:
+        name: nfs
+        state: present
+
+    - name: Restart nfs server
+      ansible.builtin.systemd:
+        state: restarted
+        name: nfs-server
