@@ -1,0 +1,7 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install probackup
+      apt:
+        name: pg-probackup-13
+        state: present
