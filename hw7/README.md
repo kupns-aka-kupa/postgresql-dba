@@ -2,14 +2,15 @@
 
 Tasks
 
-- <a name="base">Base</a>
-- <a name="hotstandby">Hot Standby</a>
+1. <a name="base">Base</a>
+2. <a name="hotstandby">Hot Standby</a>
 
 Hosts
 
 - Master <a name="master">172.23.169.19</a>
 - Replica10 <a name="r10">172.23.169.10</a>
-- Replica35 <a name="r35">172.23.169.35</a>
+- **Base** Replica35 <a name="base">172.23.169.35</a>
+- **HotStandby** Replica9 <a name="hot">172.23.169.9</a>
 
 ## <a name="base"></a> Base
 
@@ -117,3 +118,61 @@ create subscription sub_foo
 |  bar  |       2002        |
 
 ## <a name="hotstandby"></a> Hot Standby
+
+`pg_hba.conf`
+
+```shell
+host    replication             postgres             0.0.0.0/0            md5
+```
+
+```shell
+sudo pg_createcluster 13 hw7
+sudo rm -rf /var/lib/postgresql/13/hw7
+sudo -u postgres pg_basebackup -p 5434 -h 172.23.169.35 -RD /var/lib/postgresql/13/hw7
+```
+
+`postresql.conf`
+
+```shell
+wal_level = hot_standby
+```
+
+```sql
+postgres@172.23.169.35=#
+select client_addr, state, sent_lsn
+from pg_stat_replication;
+``` 
+
+| client\_addr | state     | sent\_lsn |
+|:-------------|:----------|:----------|
+| 172.23.169.9 | streaming | 0/B003A18 |
+
+ ```sql
+postgres@172.23.169.9=#
+select status, sender_port, sender_host, latest_end_lsn
+from pg_stat_wal_receiver;
+```
+
+| status    | sender_port | sender_host   | latest_end_lsn |
+|-----------|-------------|---------------|----------------|
+| streaming | 5434        | 172.23.169.35 | 0/B003A18      |
+
+### Test
+
+```sql
+postgres@172.23.169.10=#
+insert into hw7.public.bar
+values (uuid_generate_v4());
+```
+
+```sql
+postgres@172.23.169.9=# select count(*) from bar;
+```
+
+| count |
+|-------|
+| 2003  |
+
+### Schema
+
+![Schema](schema.svg)
